@@ -12,6 +12,11 @@
 // These descriptions are intended to help you understand how the interface
 // will be used. See the RFC for how the protocol works.
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketException;
+import java.util.Hashtable;
+
 interface NodeInterface {
 
     /* These methods configure your node.
@@ -81,15 +86,31 @@ interface NodeInterface {
 
 // Complete this!
 public class Node implements NodeInterface {
+    private String nodeName;
+    private int portNumber;
+    private DatagramSocket datagramSocket;
 
     public void setNodeName(String nodeName) throws Exception {
-	throw new Exception("Not implemented");
+        if (nodeName.isEmpty()) {
+            throw new Exception("Node name is empty");
+        }
+        this.nodeName = nodeName;
     }
 
     public void openPort(int portNumber) throws Exception {
-	throw new Exception("Not implemented");
+        if (portNumber <= 1024 || portNumber > 65535) {
+            throw new Exception("Invalid port number keep in range between 1024 and 65535");
+        }
+	    try {
+            this.portNumber = portNumber;
+            datagramSocket = new DatagramSocket(portNumber);
+            System.out.println("Socket at port: " + portNumber +
+                    " is ready to recieve connections");
+        }
+        catch (SocketException e) {
+            e.printStackTrace();
+        }
     }
-
     public void handleIncomingMessages(int delay) throws Exception {
 	throw new Exception("Not implemented");
     }
