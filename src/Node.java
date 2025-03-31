@@ -12,10 +12,12 @@
 // These descriptions are intended to help you understand how the interface
 // will be used. See the RFC for how the protocol works.
 
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketException;
-import java.util.Hashtable;
+import javax.xml.crypto.Data;
+import java.io.IOException;
+import java.net.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
 
 interface NodeInterface {
 
@@ -88,7 +90,17 @@ interface NodeInterface {
 public class Node implements NodeInterface {
     private String nodeName;
     private int portNumber;
-    private DatagramSocket datagramSocket;
+    private DatagramSocket socket;
+    private Map<String, String> addressPair = new HashMap<>();
+    private Map<String, String> dataPair = new HashMap<>();
+    private Stack<String> stack;
+
+ /*   private String[] formatAddressPair(String key, String value) {
+        String[] pair = new String[2];
+        key = nodeName;
+        value =
+    } */
+
 
     public void setNodeName(String nodeName) throws Exception {
         if (nodeName.isEmpty()) {
@@ -96,25 +108,90 @@ public class Node implements NodeInterface {
         }
         this.nodeName = nodeName;
     }
+    private String[] formatAddressPair(String nodeName, String inetAddress, int portNumber) {
+        String[] pair = new String[2];
+        pair[0] = "N:" + nodeName;
+        pair[1] = inetAddress + ":" + portNumber;
+        return pair;
+    }
+    private byte[] setHashID(String nodeName) throws Exception {
+        return HashID.computeHashID(nodeName);
+    }
 
     public void openPort(int portNumber) throws Exception {
-        if (portNumber <= 1024 || portNumber > 65535) {
-            throw new Exception("Invalid port number keep in range between 1024 and 65535");
+        if (portNumber >= 20110 && portNumber <= 20130) {
+            try {
+                this.portNumber = portNumber;
+                socket = new DatagramSocket(portNumber);
+                System.out.println("Socket at port: " + portNumber + " is ready to recieve connections");
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-	    try {
-            this.portNumber = portNumber;
-            datagramSocket = new DatagramSocket(portNumber);
-            System.out.println("Socket at port: " + portNumber +
-                    " is ready to recieve connections");
+        else {
+            throw new Exception("Invalid port number keep in range between 20110 and 20130");
         }
-        catch (SocketException e) {
+      //  String addressKey = "N:" + nodeName;
+        String inetAddress = socket.getLocalAddress().getHostAddress();
+        String[] pairForAddresses = formatAddressPair(nodeName, inetAddress, portNumber);
+        addressPair.put(pairForAddresses[0], pairForAddresses[1]);
+        System.out.println(pairForAddresses[0] + " " + pairForAddresses[1]);
+    }
+
+    public void handleIncomingMessages(int delay) throws Exception {
+        if (delay > 0) {
+            socket.setSoTimeout(delay);
+        }
+        else {
+            socket.setSoTimeout(0);
+        }
+
+        byte[] buffer = new byte[1024];
+        DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length);
+        try {
+            socket.receive(datagramPacket);
+            String message = new String(datagramPacket.getData(), 0 ,datagramPacket.getLength());
+            if (message.length() < 4) return;
+
+            // Storing IP and port for response
+            InetAddress inetAddress = datagramPacket.getAddress();
+            int port = datagramPacket.getPort();
+            String transactionID = message.substring(0,2);
+
+            String payload = message.substring(3);
+            char messageType = payload.charAt(0);
+
+            System.out.println(transactionID + " " + payload + " " + messageType);
+            switch (messageType) {
+                case 'G':
+                    sendNameResponse(transactionID, inetAddress, port);
+                    break;
+                case 'H':
+              //      sendNearestResponse(transactionID, );
+                    break;
+                case 'N': break;
+                case 'O': break;
+                case 'I': break;
+                case 'V':
+                    break;
+            }
+            System.out.println("Message: " + message);
+        }
+        catch (SocketTimeoutException e) {
             e.printStackTrace();
         }
     }
-    public void handleIncomingMessages(int delay) throws Exception {
-	throw new Exception("Not implemented");
+    private void sendNameResponse(String transactionID, InetAddress destinationAddress, int destinationPort) throws IOException {
+      //  byte[] buffer = new byte[1024];
+        String message = transactionID + 'H' + ' ' + nodeName;
+        byte[] messageBytes = message.getBytes();
+        DatagramPacket datagramPacket = new DatagramPacket(messageBytes, messageBytes.length, destinationAddress, destinationPort);
+        socket.send(datagramPacket);
     }
-    
+    private void sendNearestResponse(String transactionID, InetAddress destAddress, int port) {
+
+    }
     public boolean isActive(String nodeName) throws Exception {
 	throw new Exception("Not implemented");
     }
@@ -142,4 +219,23 @@ public class Node implements NodeInterface {
     public boolean CAS(String key, String currentValue, String newValue) throws Exception {
 	throw new Exception("Not implemented");
     }
+
+
+    public static void main(String[] args) {
+        try {
+            Node node = new Node();
+
+            // Example tests
+            node.setNodeName("Node1");
+            System.out.println("Node name set successfully.");
+
+            node.openPort(20112);
+            System.out.println("Port opened successfully.");
+
+            node.handleIncomingMessages(10000); // Listen for messages for 10 seconds
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }
