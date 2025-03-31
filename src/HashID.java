@@ -14,4 +14,5 @@ public class HashID {
 	md.update(s.getBytes(StandardCharsets.UTF_8));
 	return md.digest();
     }
+
 }

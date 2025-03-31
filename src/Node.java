@@ -117,6 +117,20 @@ public class Node implements NodeInterface {
     private byte[] setHashID(String nodeName) throws Exception {
         return HashID.computeHashID(nodeName);
     }
+    private int computeHashDistance(byte[] hash1, byte[] hash2) throws Exception {
+        int matchingBits = 0;
+        for (int i = 0; i < hash1.length; i++) {
+            for (int j = 7; j >= 0; j--) {
+                if (((hash1[i] >> j) & 1) == ((hash2[i] >> j) & 1)) {
+                    matchingBits++;
+                }
+                else {
+                    return 256 - matchingBits;
+                }
+            }
+        }
+        return 0;
+    }
 
     public void openPort(int portNumber) throws Exception {
         if (portNumber >= 20110 && portNumber <= 20130) {
