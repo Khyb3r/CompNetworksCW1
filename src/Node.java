@@ -12,12 +12,9 @@
 // These descriptions are intended to help you understand how the interface
 // will be used. See the RFC for how the protocol works.
 
-import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.net.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 interface NodeInterface {
 
@@ -93,7 +90,7 @@ public class Node implements NodeInterface {
     private DatagramSocket socket;
     private Map<String, String> addressPair = new HashMap<>();
     private Map<String, String> dataPair = new HashMap<>();
-    private Stack<String> stack;
+    private Stack<String> stack = new Stack<>();
 
  /*   private String[] formatAddressPair(String key, String value) {
         String[] pair = new String[2];
@@ -107,6 +104,7 @@ public class Node implements NodeInterface {
             throw new Exception("Node name is empty");
         }
         this.nodeName = nodeName;
+
     }
     private String[] formatAddressPair(String nodeName, String inetAddress, int portNumber) {
         String[] pair = new String[2];
@@ -114,29 +112,11 @@ public class Node implements NodeInterface {
         pair[1] = inetAddress + ":" + portNumber;
         return pair;
     }
-    private byte[] setHashID(String nodeName) throws Exception {
-        return HashID.computeHashID(nodeName);
-    }
-    private int computeHashDistance(byte[] hash1, byte[] hash2) throws Exception {
-        int matchingBits = 0;
-        for (int i = 0; i < hash1.length; i++) {
-            for (int j = 7; j >= 0; j--) {
-                if (((hash1[i] >> j) & 1) == ((hash2[i] >> j) & 1)) {
-                    matchingBits++;
-                }
-                else {
-                    return 256 - matchingBits;
-                }
-            }
-        }
-        return 0;
-    }
-
     public void openPort(int portNumber) throws Exception {
         if (portNumber >= 20110 && portNumber <= 20130) {
             try {
                 this.portNumber = portNumber;
-                socket = new DatagramSocket(portNumber);
+                this.socket = new DatagramSocket(portNumber);
                 System.out.println("Socket at port: " + portNumber + " is ready to recieve connections");
             }
             catch (Exception e) {
@@ -154,68 +134,118 @@ public class Node implements NodeInterface {
     }
 
     public void handleIncomingMessages(int delay) throws Exception {
-        if (delay > 0) {
-            socket.setSoTimeout(delay);
+        if (socket == null) {
+            throw new IllegalStateException("Port should be open before handling messages");
         }
-        else {
-            socket.setSoTimeout(0);
-        }
+        socket.setSoTimeout(delay > 0 ? delay : 0);
 
         byte[] buffer = new byte[1024];
         DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length);
         try {
             socket.receive(datagramPacket);
-            String message = new String(datagramPacket.getData(), 0 ,datagramPacket.getLength());
-            if (message.length() < 4) return;
-
-            // Storing IP and port for response
-            InetAddress inetAddress = datagramPacket.getAddress();
-            int port = datagramPacket.getPort();
-            String transactionID = message.substring(0,2);
-
-            String payload = message.substring(3);
-            char messageType = payload.charAt(0);
-
-            System.out.println(transactionID + " " + payload + " " + messageType);
-            switch (messageType) {
-                case 'G':
-                    sendNameResponse(transactionID, inetAddress, port);
-                    break;
-                case 'H':
-              //      sendNearestResponse(transactionID, );
-                    break;
-                case 'N': break;
-                case 'O': break;
-                case 'I': break;
-                case 'V':
-                    break;
-            }
-            System.out.println("Message: " + message);
+            processIncomingMessage(datagramPacket);
         }
         catch (SocketTimeoutException e) {
-            e.printStackTrace();
+            System.out.println("Didn't recieve any messages");;
+        }
+    }
+    private void processIncomingMessage(DatagramPacket packet) throws Exception {
+
+        String message = new String(packet.getData(), 0, packet.getLength());
+        if (message.length() < 4) return;
+
+        // Storing IP and port for response
+        InetAddress inetAddress = packet.getAddress();
+        int port = packet.getPort();
+        String transactionID = message.substring(0, 2);
+
+        String payload = message.substring(3);
+        char messageType = payload.charAt(0);
+        System.out.println(transactionID);
+
+        System.out.println(transactionID + " " + payload + " " + messageType);
+        switch (messageType) {
+            case 'G':
+                sendNameResponse(transactionID, inetAddress, port);
+                break;
+            case 'H':
+                sendNearestResponse(transactionID, inetAddress, port, payload.substring(2));
+                break;
+            case 'N':
+                break;
+            case 'O':
+                break;
+            case 'I':
+                break;
+            case 'V':
+                break;
         }
     }
     private void sendNameResponse(String transactionID, InetAddress destinationAddress, int destinationPort) throws IOException {
-      //  byte[] buffer = new byte[1024];
-        String message = transactionID + 'H' + ' ' + nodeName;
-        byte[] messageBytes = message.getBytes();
+        // Sending Name response when receiving Name request
+        String response = transactionID + " " + 'H' + ' ' + nodeName;
+        byte[] messageBytes = response.getBytes();
         DatagramPacket datagramPacket = new DatagramPacket(messageBytes, messageBytes.length, destinationAddress, destinationPort);
         socket.send(datagramPacket);
     }
-    private void sendNearestResponse(String transactionID, InetAddress destAddress, int port) {
 
+    private void sendNearestResponse(String transactionID, InetAddress destAddress, int port, String hashID) throws Exception {
+        byte[] targetHash = new byte[32];
+        for (int i = 0; i < 32; i++) {
+            targetHash[i] = (byte) Integer.parseInt(hashID.substring(i * 2, i * 2 + 2), 16);
+        }
+
+        Map<String, Integer> distances = new HashMap<>();
+
+        for (String nodeAddr : addressPair.keySet()) {
+            byte[] nodeHash = Helper.getHashID(nodeAddr);
+            distances.put(nodeAddr, Helper.computeHashDistance(nodeHash, targetHash));
+        }
+
+        List<Map.Entry<String, Integer>> distanceList = new ArrayList<>(distances.entrySet());
+        Collections.sort(distanceList, new Comparator<Map.Entry<String, Integer>>() {
+            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
+                return o1.getValue().compareTo(o2.getValue());
+            }
+        });
+
+        String response = transactionID + ' ' + "O ";
+        int count = 0;
+        for (Map.Entry<String, Integer> entry : distanceList) {
+            if (count < 3) {
+                response += formatString(entry.getKey() + " " + addressPair.get(entry.getKey()));
+                count++;
+            } else {
+                break;
+            }
+        }
+        byte[] responseBytes = response.getBytes();
+        DatagramPacket responsePacket = new DatagramPacket(responseBytes, responseBytes.length, destAddress, port);
+        socket.send(responsePacket);
     }
+    private String formatString(String str) {
+        return str.split(" ").length - 1 + " " + str + " ";
+    }
+
     public boolean isActive(String nodeName) throws Exception {
-	throw new Exception("Not implemented");
+        for (String addressNodeName : addressPair.keySet()) {
+
+        }
+        String activeMessage = "";
+	 //   DatagramPacket datagramPacket = new DatagramPacket();
+        throw new Exception("Not implemented");
     }
     
     public void pushRelay(String nodeName) throws Exception {
-	throw new Exception("Not implemented");
+	    stack.push(nodeName);
+       // throw new Exception("Not implemented");
     }
 
     public void popRelay() throws Exception {
-        throw new Exception("Not implemented");
+        if (!stack.isEmpty()) {
+            stack.pop();
+        }
+     //   throw new Exception("Not implemented");
     }
 
     public boolean exists(String key) throws Exception {
@@ -246,10 +276,9 @@ public class Node implements NodeInterface {
             node.openPort(20112);
             System.out.println("Port opened successfully.");
 
-            node.handleIncomingMessages(10000); // Listen for messages for 10 seconds
+            node.handleIncomingMessages(1000); // Listen for messages for 10 seconds
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 }
