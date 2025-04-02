@@ -210,7 +210,6 @@ Abstract
 
 
 6.1. Name Request And Name Response Messages
-
    A name request message consists of a message header followed by a
    single 'G' character.
 
