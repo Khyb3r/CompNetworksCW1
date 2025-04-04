@@ -1,5 +1,6 @@
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -36,10 +37,6 @@ public class Helper {
         if (input == null) return "0 ";
         int spaceCount = input.length() - input.replace(" ", "").length();
         return spaceCount + " ";
-    }
-
-    public static String dataKeyFormat(String s) {
-        return "D:" + s;
     }
 
     public static String[] relayMessageParsing(String str) {
@@ -137,8 +134,18 @@ public class Helper {
 
 
     public static void main(String[] args) {
-        String str1 = "0 N:test 0 192.168.1.117:20111 ";
-        System.out.println(Helper.parseSpacedFields(str1));
+
+        String str1 = "AB V 0 N:test AC R 0 :N:test";
+        String[] splitRelayMessage = str1.split(" ", 3);
+        String transactionID = splitRelayMessage[0];
+        String[] restOfMessage = Helper.relayMessageParsing(splitRelayMessage[2]);
+        String nodeName = restOfMessage[0];
+        String forwardMessage = restOfMessage[1];
+        System.out.println(transactionID);
+        System.out.println(forwardMessage);
+        System.out.println(nodeName);
+
+
     }
 
 }
