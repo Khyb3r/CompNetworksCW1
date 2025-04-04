@@ -421,8 +421,15 @@ public class Node implements NodeInterface {
         }
     }
     private void handleReadResponse(List<String> payload) {
-        if (payload.size() >= 4 && payload.get(1).equals("Y")) {
-            pendingResponses.put(payload.get(0), payload.get(3));
+        if (payload.size() >= 4) {
+            if (payload.get(1).equals("S")) {
+                String responseType = payload.get(2);
+                if (responseType.equals("Y") && payload.size() >= 4) {
+                    pendingResponses.put(payload.get(0), payload.get(3));
+                } else if (responseType.equals("N") || responseType.equals("?")) {
+                    pendingResponses.put(payload.get(0), null);
+                }
+            }
         }
     }
     private void handleWriteResponse(List<String> payload) {
