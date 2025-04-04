@@ -199,12 +199,14 @@ public class Node implements NodeInterface {
             case "D":
                 handleCASResponse(parts);
             // Info Response
+                break;
             case "I":
                 handleInfoMessageRequest(parts);
                 break;
             // Relay message handler
             case "V":
                 handleRelayMessage(message);
+                break;
             default: throw new Exception("Unknown message type: " + messageTypeChar);
         }
     }
