@@ -1,5 +1,6 @@
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 
 public class Helper {
@@ -8,29 +9,6 @@ public class Helper {
         char second = (char) (65 + (int) (Math.random() * 26));
         return "" + first + second + " ";
     }
-    public static int computeHashDistance(byte[] hash1, byte[] hash2) throws Exception {
-        int matchingBits = 0;
-        for (int i = 0; i < hash1.length; i++) {
-            for (int j = 7; j >= 0; j--) {
-                if (((hash1[i] >> j) & 1) == ((hash2[i] >> j) & 1)) {
-                    matchingBits++;
-                }
-                else {
-                    return 256 - matchingBits;
-                }
-            }
-        }
-        return 0;
-    }
-
-    public static byte[] HashIDStringToBytes(String s) {
-        byte[] targetHash = new byte[32];
-        for (int i = 0; i < 32; i++) {
-            targetHash[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
-        }
-        return targetHash;
-    }
-
     public static String formatStringToCRNMessage(String s) {
         int spaces = 0;
         for (char c : s.toCharArray()) {
@@ -40,7 +18,6 @@ public class Helper {
         }
         return spaces + " " + s + " ";
     }
-
     public static String formatCRNMessageToString(String s) {
         String[] parts = s.split(" ", 2);
         if (parts.length > 2) {
@@ -54,6 +31,11 @@ public class Helper {
             e.printStackTrace();
         }
         return parts[1].trim();
+    }
+    public static String checkForSpaces(String input) {
+        if (input == null) return "0 ";
+        int spaceCount = input.length() - input.replace(" ", "").length();
+        return spaceCount + " ";
     }
 
     public static String dataKeyFormat(String s) {
@@ -85,39 +67,74 @@ public class Helper {
         return finalForm;
     }
 
+    public static InetSocketAddress returnSocketAddress(String address) {
+        try {
+            String[] parts = address.split(":");
+            if (parts.length == 2) {
+                return new InetSocketAddress(parts[0], Integer.parseInt(parts[1]));
+            }
+        } catch (Exception e) {
+            System.err.println("Error parsing address: " + address + " - " + e.getMessage());
+        }
+        return null;
+    }
+
     public static List<String> parseSpacedFields(String message) {
-        List<String> parsedFields = new ArrayList<>();
-        String[] pieces = message.split(" ");
+        List<String> result = new ArrayList<>();
+        String[] parts = message.split(" ");
         int i = 0;
 
-        while (i < pieces.length) {
+        while (i < parts.length) {
             try {
-                int numSpaces = Integer.parseInt(pieces[i]);
-                int expectedPieces = numSpaces + 1;
+                int spaceCount = Integer.parseInt(parts[i]);
+                StringBuilder field = new StringBuilder();
 
-                if (i + expectedPieces >= pieces.length) {
-                    break;
+                for (int j = 1; j <= spaceCount + 1 && i + j < parts.length; j++) {
+                    if (j > 1) field.append(" ");
+                    field.append(parts[i + j]);
                 }
 
-                StringBuilder builder = new StringBuilder();
-                for (int j = 0; j < expectedPieces; j++) {
-                    if (j > 0) {
-                        builder.append(" ");
-                    }
-                    builder.append(pieces[i + 1 + j]);
-                }
-                parsedFields.add(builder.toString());
-                i += expectedPieces + 1;
-
+                result.add(field.toString());
+                i += spaceCount + 2;
             } catch (NumberFormatException e) {
-                parsedFields.add(pieces[i]);
+                result.add(parts[i]);
                 i++;
-            } catch (ArrayIndexOutOfBoundsException e) {
+            }
+        }
+
+        return result;
+    }
+
+    public static int computeHashDistance(String hash1, String hash2) {
+        int distance = 0;
+        int length = Math.min(hash1.length(), hash2.length());
+
+        for (int i = 0; i < length; i++) {
+            int val1 = Integer.parseInt(hash1.substring(i, i+1), 16);
+            int val2 = Integer.parseInt(hash2.substring(i, i+1), 16);
+            int xor = val1 ^ val2;
+
+            if (xor == 0) {
+                distance += 4;
+            } else {
+                distance += Integer.numberOfLeadingZeros(xor) - 28;
                 break;
             }
         }
-        return parsedFields;
+
+        return 256 - Math.min(distance, 256);
     }
+
+    public static String formatSpaces(String input) {
+        if (input == null) return "0 ";
+        int spaceCount = input.length() - input.replace(" ", "").length();
+        return spaceCount + " ";
+    }
+
+    public static String fromBytesToHexFormat(byte[] bytes) {
+        return HexFormat.of().formatHex(bytes);
+    }
+
 
     public static void main(String[] args) {
         String str1 = "0 N:test 0 192.168.1.117:20111 ";
