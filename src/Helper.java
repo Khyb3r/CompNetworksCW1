@@ -120,9 +120,6 @@ public class Helper {
     }
 
     public static void main(String[] args) {
-        System.out.println(Arrays.toString(relayMessageParsing("3 N:Spaces are here hello message")));
-        String str = "N:name";
-        String str2 = "127:01:01:00:20010";
         String str1 = "0 N:test 0 192.168.1.117:20111 ";
         System.out.println(Helper.parseSpacedFields(str1));
     }
